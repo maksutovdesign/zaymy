@@ -153,6 +153,8 @@ export default function SettingsScreen() {
           text: "Очистить",
           style: "destructive",
           onPress: async () => {
+            // Sequential calls are safe: removeLoan uses a ref that updates
+            // immediately after each call, so each next call sees the latest list.
             for (const id of completedIds) {
               await removeLoan(id);
             }
@@ -235,6 +237,7 @@ export default function SettingsScreen() {
             <Text style={styles.avatarText}>
               {user.name
                 .split(" ")
+                .filter(Boolean)
                 .map((w) => w[0])
                 .slice(0, 2)
                 .join("")
@@ -364,7 +367,7 @@ export default function SettingsScreen() {
             icon="star"
             label="Советник"
             value={selectedChar?.name}
-            onPress={() => router.push("/(auth)/welcome")}
+            onPress={() => router.push("/(auth)/welcome?mode=edit")}
           />
         </SettingSection>
 

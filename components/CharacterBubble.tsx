@@ -38,7 +38,7 @@ export function CharacterBubble({ character, context, onDismiss, style }: Props)
     ]).start();
   }, []);
 
-  const tip = character.tips[context];
+  const tip = character.tips[context] ?? "";
 
   return (
     <Animated.View

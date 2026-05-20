@@ -30,9 +30,14 @@
 import { Platform, Alert } from "react-native";
 
 // ─── Config ────────────────────────────────────────────────────────────────
-// TODO: replace with real keys from https://app.revenuecat.com/apps
-const REVENUECAT_API_KEY_IOS = "appl_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
-const REVENUECAT_API_KEY_ANDROID = "goog_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+// Keys are read from environment variables so they are never committed to source
+// control.  Set EXPO_PUBLIC_REVENUECAT_IOS_KEY and
+// EXPO_PUBLIC_REVENUECAT_ANDROID_KEY in your .env.local file (gitignored).
+// Placeholder values keep the app buildable before real keys are configured.
+const REVENUECAT_API_KEY_IOS =
+  process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? "appl_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+const REVENUECAT_API_KEY_ANDROID =
+  process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? "goog_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
 
 // Product identifiers — must match App Store Connect / Google Play Console
 export const PRODUCT_IDS = {

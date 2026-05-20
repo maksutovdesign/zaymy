@@ -1,5 +1,5 @@
 import * as Haptics from "expo-haptics";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
   Animated,
@@ -20,9 +20,12 @@ import { useColors } from "@/hooks/useColors";
 export default function WelcomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { setUserName } = useApp();
+  const { setUserName, setSelectedCharacter } = useApp();
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const isEditMode = mode === "edit";
 
-  const [step, setStep] = useState<1 | 2>(1);
+  // In edit mode start directly at character selection (step 2)
+  const [step, setStep] = useState<1 | 2>(isEditMode ? 2 : 1);
   const [name, setName] = useState("");
   const [selectedChar, setSelectedChar] = useState("lucha");
   const [isLoading, setIsLoading] = useState(false);
@@ -67,8 +70,15 @@ export default function WelcomeScreen() {
       }),
     ]).start();
     setIsLoading(true);
-    await setUserName(name.trim(), "", selectedChar);
-    router.replace("/(tabs)");
+
+    if (isEditMode) {
+      // Only change the character — do NOT reset karma or createdAt
+      await setSelectedCharacter(selectedChar);
+      router.back();
+    } else {
+      await setUserName(name.trim(), "", selectedChar);
+      router.replace("/(tabs)");
+    }
   };
 
   const selectedCharacter = CHARACTERS.find((c) => c.id === selectedChar)!;

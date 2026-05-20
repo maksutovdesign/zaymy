@@ -10,11 +10,10 @@ import {
   StyleSheet,
   Text,
   View,
-  FlatList,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CharacterBubble } from "@/components/CharacterBubble";
-import { getCharacterById } from "@/constants/characters";
+import { CHARACTERS, getCharacterById } from "@/constants/characters";
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -80,7 +79,7 @@ export default function ProfileScreen() {
   });
 
   const selectedChar = getCharacterById(user.selectedCharacterId ?? "lucha");
-  const gradus = getCharacterById("gradus")!;
+  const gradus = getCharacterById("gradus") ?? CHARACTERS[0];
   const avatarScale = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -92,8 +91,10 @@ export default function ProfileScreen() {
     }).start();
   }, []);
 
+  // filter(Boolean) removes empty strings from double-spaces or trailing space
   const initials = user.name
     .split(" ")
+    .filter(Boolean)
     .map((w) => w[0])
     .slice(0, 2)
     .join("")
@@ -285,16 +286,17 @@ export default function ProfileScreen() {
               {earnedBadges.length}/{ALL_BADGES.length}
             </Text>
           </View>
-          <FlatList
+          {/* Horizontal ScrollView instead of FlatList to avoid nested VirtualizedList warning */}
+          <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            data={ALL_BADGES}
-            keyExtractor={(b) => b.id}
             contentContainerStyle={styles.badgesScroll}
-            renderItem={({ item: badge }) => {
+          >
+            {ALL_BADGES.map((badge) => {
               const earned = earnedBadges.some((b) => b.id === badge.id);
               return (
                 <View
+                  key={badge.id}
                   style={[
                     styles.badgeChip,
                     {
@@ -323,8 +325,8 @@ export default function ProfileScreen() {
                   )}
                 </View>
               );
-            }}
-          />
+            })}
+          </ScrollView>
         </View>
       )}
 

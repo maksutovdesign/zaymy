@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CharacterBubble } from "@/components/CharacterBubble";
-import { getCharacterById } from "@/constants/characters";
+import { CHARACTERS, getCharacterById } from "@/constants/characters";
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -47,39 +47,49 @@ export default function GiveLoanScreen() {
       return;
     }
 
-    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setIsLoading(true);
-
-    const dueDate = new Date();
-    const termDays = parseInt(term) || 30;
-    dueDate.setDate(dueDate.getDate() + termDays);
-
-    const result = await addLoan({
-      type: "given",
-      contact: contact.trim(),
-      amount: amountNum,
-      term: `${termDays} дней`,
-      interestRate: rate,
-      account: account.trim(),
-      status: "active",
-      dueDate: dueDate.toISOString(),
-    });
-
-    setIsLoading(false);
-
-    if (!result.success) {
-      Alert.alert("Лимит займов", result.error ?? "Не удалось добавить займ");
+    const termDays = parseInt(term);
+    if (!termDays || termDays <= 0) {
+      Alert.alert("Ошибка", "Срок должен быть больше 0 дней");
       return;
     }
 
-    Alert.alert(
-      "Займ записан!",
-      `${contact} — ${amountNum.toLocaleString("ru-RU")} ₽\nКарма +40 ⭐`,
-      [{ text: "Готово", onPress: () => router.back() }]
-    );
+    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setIsLoading(true);
+
+    try {
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + termDays);
+
+      const result = await addLoan({
+        type: "given",
+        contact: contact.trim(),
+        amount: amountNum,
+        term: `${termDays} дней`,
+        interestRate: rate,
+        account: account.trim(),
+        status: "active",
+        dueDate: dueDate.toISOString(),
+      });
+
+      if (!result.success) {
+        Alert.alert("Лимит займов", result.error ?? "Не удалось добавить займ");
+        return;
+      }
+
+      Alert.alert(
+        "Займ записан!",
+        `${contact} — ${amountNum.toLocaleString("ru-RU")} ₽\nКарма +40 ⭐`,
+        [{ text: "Готово", onPress: () => router.back() }]
+      );
+    } catch (e) {
+      console.error("[give] addLoan error:", e);
+      Alert.alert("Ошибка", "Не удалось сохранить займ. Попробуй ещё раз.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const zyuyd = getCharacterById("zyuyd")!;
+  const zyuyd = getCharacterById("zyuyd") ?? CHARACTERS[0];
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

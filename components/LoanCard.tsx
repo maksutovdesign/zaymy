@@ -110,7 +110,9 @@ export function LoanCard({ loan, compact = false }: Props) {
       `${loan.contact} — ${formatAmount(loan.amount)}`,
       [
         { text: "Отмена", style: "cancel" },
-        { text: "Возвращён", onPress: () => updateLoanStatus(loan.id, "returned") },
+        { text: "Возвращён", onPress: async () => {
+          await updateLoanStatus(loan.id, "returned").catch(console.error);
+        }},
       ]
     );
   };
@@ -118,7 +120,9 @@ export function LoanCard({ loan, compact = false }: Props) {
   const handleDelete = () => {
     Alert.alert("Удалить запись?", undefined, [
       { text: "Отмена", style: "cancel" },
-      { text: "Удалить", style: "destructive", onPress: () => removeLoan(loan.id) },
+      { text: "Удалить", style: "destructive", onPress: async () => {
+        await removeLoan(loan.id).catch(console.error);
+      }},
     ]);
   };
 

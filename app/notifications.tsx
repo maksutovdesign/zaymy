@@ -38,9 +38,9 @@ export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const { notifications, markNotificationRead } = useApp();
 
-  const handlePress = (id: string) => {
+  const handlePress = async (id: string) => {
     if (Platform.OS !== "web") Haptics.selectionAsync();
-    markNotificationRead(id);
+    await markNotificationRead(id).catch(console.error);
   };
 
   return (

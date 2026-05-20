@@ -170,9 +170,11 @@ export default function LoanDetailScreen() {
     ]);
   };
 
+  // parseInt("30 дней") = 30 ✓, but any non-numeric term → NaN → fallback to 30
+  const termDays = parseInt(loan.term) || 30;
   const totalWithInterest =
     loan.interestRate > 0
-      ? loan.amount * (1 + (loan.interestRate / 100) * (parseInt(loan.term) / 30))
+      ? loan.amount * (1 + (loan.interestRate / 100) * (termDays / 30))
       : loan.amount;
 
   const daysOverdue = isOverdue ? Math.abs(daysLeft) : 0;

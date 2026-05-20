@@ -1,6 +1,9 @@
 import { BlurView } from "expo-blur";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
+// TODO: "unstable-native-tabs" is an experimental Expo Router API — it may
+// change or be removed in future SDK releases. Check the changelog before
+// upgrading expo-router and test native tab behavior on each upgrade.
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";

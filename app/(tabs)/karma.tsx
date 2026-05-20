@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CharacterBubble } from "@/components/CharacterBubble";
-import { getCharacterById } from "@/constants/characters";
+import { CHARACTERS, getCharacterById } from "@/constants/characters";
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -71,22 +71,26 @@ export default function KarmaScreen() {
   const progressAnim = useRef(new Animated.Value(0)).current;
   const karmaAnim = useRef(new Animated.Value(0)).current;
 
+  // Card entrance animation — runs once on mount
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(progressAnim, {
-        toValue: progress,
-        duration: 1200,
-        useNativeDriver: false,
-      }),
-      Animated.timing(karmaAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: Platform.OS !== "web",
-      }),
-    ]).start();
+    Animated.timing(karmaAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: Platform.OS !== "web",
+    }).start();
   }, []);
 
-  const lucha = getCharacterById("lucha")!;
+  // Progress bar animation — re-runs whenever karma (and therefore `progress`) changes
+  useEffect(() => {
+    progressAnim.setValue(0);
+    Animated.timing(progressAnim, {
+      toValue: progress,
+      duration: 1200,
+      useNativeDriver: false,
+    }).start();
+  }, [progress]);
+
+  const lucha = getCharacterById("lucha") ?? CHARACTERS[0];
 
   return (
     <ScrollView

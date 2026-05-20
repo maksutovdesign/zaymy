@@ -76,15 +76,13 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) return null;
-
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
         <AppProvider>
           <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
-              <RootLayoutNav />
+              {fontsLoaded || fontError ? <RootLayoutNav /> : null}
             </KeyboardProvider>
           </GestureHandlerRootView>
         </AppProvider>

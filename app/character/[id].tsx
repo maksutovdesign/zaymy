@@ -213,7 +213,7 @@ export default function CharacterDetailScreen() {
                     borderWidth: 2,
                   },
                 ]}
-                onPress={() => router.replace(`/character/${ch.id}`)}
+                onPress={() => router.push(`/character/${ch.id}`)}
               >
                 <View
                   style={[

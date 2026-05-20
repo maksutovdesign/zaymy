@@ -10,6 +10,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
@@ -181,6 +182,18 @@ const DEMO_NOTIFICATIONS: Notification[] = [
   },
 ];
 
+// Safe JSON parser — returns fallback on parse error or null/undefined input.
+// Prevents crashes from corrupted AsyncStorage data (partial writes, manual edits).
+function safeParse<T>(str: string | null | undefined, fallback: T): T {
+  if (!str) return fallback;
+  try {
+    const result = JSON.parse(str);
+    return result ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -191,8 +204,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [blacklist, setBlacklist] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Refs hold the LATEST state value so callbacks never capture stale closures.
+  // Updated immediately inside each save* helper (before setXxx), so sequential
+  // async calls within a single handler always read the up-to-date value.
+  const userRef = useRef(user);
+  const loansRef = useRef(loans);
+  const notificationsRef = useRef(notifications);
+  const karmaHistoryRef = useRef(karmaHistory);
+  const blacklistRef = useRef(blacklist);
+
   useEffect(() => {
-    loadData();
+    loadData().catch(console.error);
   }, []);
 
   const loadData = async () => {
@@ -206,19 +228,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           AsyncStorage.getItem("@zaymy_karma_history"),
         ]);
 
-      const loadedUser: User = userStr
-        ? { ...DEFAULT_USER, ...JSON.parse(userStr) }
-        : DEFAULT_USER;
+      const loadedUser: User = {
+        ...DEFAULT_USER,
+        ...safeParse<Partial<User>>(userStr, {}),
+      };
+      // Sanitize numeric fields — prevents NaN in UI if stored value is corrupt
+      loadedUser.karma = Number.isFinite(loadedUser.karma) ? loadedUser.karma : 0;
+      loadedUser.totalGiven = Number.isFinite(loadedUser.totalGiven) ? loadedUser.totalGiven : 0;
+      loadedUser.totalTaken = Number.isFinite(loadedUser.totalTaken) ? loadedUser.totalTaken : 0;
+      loadedUser.totalReturned = Number.isFinite(loadedUser.totalReturned) ? loadedUser.totalReturned : 0;
+      loadedUser.friendsCount = Number.isFinite(loadedUser.friendsCount) ? loadedUser.friendsCount : 0;
 
-      let loadedLoans: Loan[] = loansStr ? JSON.parse(loansStr) : DEMO_LOANS;
-      const loadedNotifs: Notification[] = notifStr
-        ? JSON.parse(notifStr)
-        : DEMO_NOTIFICATIONS;
-      const loadedKarmaHist: KarmaEvent[] = karmaHistStr
-        ? JSON.parse(karmaHistStr)
-        : [];
+      let loadedLoans: Loan[] = safeParse<Loan[]>(loansStr, DEMO_LOANS);
+      if (!Array.isArray(loadedLoans)) loadedLoans = DEMO_LOANS;
 
-      if (blacklistStr) setBlacklist(JSON.parse(blacklistStr));
+      const loadedNotifs: Notification[] = (() => {
+        const parsed = safeParse<Notification[]>(notifStr, DEMO_NOTIFICATIONS);
+        return Array.isArray(parsed) ? parsed : DEMO_NOTIFICATIONS;
+      })();
+
+      const loadedKarmaHist: KarmaEvent[] = (() => {
+        const parsed = safeParse<KarmaEvent[]>(karmaHistStr, []);
+        return Array.isArray(parsed) ? parsed : [];
+      })();
+
+      if (blacklistStr) {
+        const bl = safeParse<string[]>(blacklistStr, []);
+        setBlacklist(Array.isArray(bl) ? bl : []);
+      }
 
       // Auto-process overdue loans
       const today = new Date().toDateString();
@@ -237,7 +274,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // autoWriteOff: mark as returned automatically
         if (loadedUser.autoWriteOff) {
           newNotifs.push({
-            id: `auto_writeoff_${loan.id}_${Date.now()}`,
+            // append random suffix — multiple loans can be processed in the same ms
+            id: `auto_writeoff_${loan.id}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
             type: "received",
             title: "Займ списан автоматически",
             message: `Займ ${loan.contact} на ${loan.amount.toLocaleString("ru-RU")} ₽ автоматически закрыт.`,
@@ -257,7 +295,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           karmaDeduction += 5;
 
           newNotifs.push({
-            id: `overdue_${loan.id}_${Date.now()}`,
+            id: `overdue_${loan.id}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
             type: "overdue",
             title: "Просрочка!",
             message: `${loan.type === "given" ? loan.contact + " не вернул" : "Ты не вернул"} ${loan.amount.toLocaleString("ru-RU")} ₽. Просрочка: ${daysOverdue} дн.`,
@@ -328,26 +366,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const saveUser = async (u: User) => {
+    userRef.current = u;
     await AsyncStorage.setItem("@zaymy_user", JSON.stringify(u));
     setUser(u);
   };
 
   const saveLoans = async (l: Loan[]) => {
+    loansRef.current = l;
     await AsyncStorage.setItem("@zaymy_loans", JSON.stringify(l));
     setLoans(l);
   };
 
   const saveBlacklist = async (bl: string[]) => {
+    blacklistRef.current = bl;
     await AsyncStorage.setItem("@zaymy_blacklist", JSON.stringify(bl));
     setBlacklist(bl);
   };
 
   const saveNotifications = async (n: Notification[]) => {
+    notificationsRef.current = n;
     await AsyncStorage.setItem("@zaymy_notifications", JSON.stringify(n));
     setNotifications(n);
   };
 
   const saveKarmaHistory = async (h: KarmaEvent[]) => {
+    karmaHistoryRef.current = h;
     await AsyncStorage.setItem("@zaymy_karma_history", JSON.stringify(h));
     setKarmaHistory(h);
   };
@@ -360,16 +403,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         createdAt: new Date().toISOString(),
         read: false,
       };
-      const updated = [newNotif, ...notifications];
+      // Use ref — always reads latest notifications even in sequential async calls
+      const updated = [newNotif, ...notificationsRef.current];
       await saveNotifications(updated);
     },
-    [notifications]
+    []
   );
 
   const setUserName = useCallback(
     async (name: string, phone = "", characterId = "lucha") => {
       const updated: User = {
-        ...user,
+        ...userRef.current,
         name,
         phone,
         karma: 100,
@@ -386,37 +430,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         reason: "Добро пожаловать в Дай в долг!",
         icon: "star",
       };
-      await saveKarmaHistory([welcomeEvent, ...karmaHistory]);
+      await saveKarmaHistory([welcomeEvent, ...karmaHistoryRef.current]);
     },
-    [user, karmaHistory]
+    []
   );
 
   const updateUser = useCallback(
     async (updates: Partial<User>) => {
-      const updated = { ...user, ...updates };
+      const updated = { ...userRef.current, ...updates };
       await saveUser(updated);
     },
-    [user]
+    []
   );
 
   const setSelectedCharacter = useCallback(
     async (id: string) => {
-      await saveUser({ ...user, selectedCharacterId: id });
+      await saveUser({ ...userRef.current, selectedCharacterId: id });
     },
-    [user]
+    []
   );
 
   const setPremiumTier = useCallback(
     async (tier: 0 | 1 | 2) => {
-      await saveUser({ ...user, premiumTier: tier, isPremium: tier > 0 });
+      await saveUser({ ...userRef.current, premiumTier: tier, isPremium: tier > 0 });
     },
-    [user]
+    []
   );
 
   const addLoan = useCallback(
     async (loan: Omit<Loan, "id" | "createdAt">) => {
       // Check blacklist
-      if (blacklist.some((b) => b.toLowerCase() === loan.contact.toLowerCase().trim())) {
+      if (blacklistRef.current.some((b) => b.toLowerCase() === loan.contact.toLowerCase().trim())) {
         return {
           success: false,
           error: `${loan.contact} находится в чёрном списке. Удали контакт из чёрного списка чтобы продолжить.`,
@@ -424,8 +468,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Enforce Basic tier loan limit
-      if (user.premiumTier === 0) {
-        const activeCount = loans.filter(
+      if (userRef.current.premiumTier === 0) {
+        const activeCount = loansRef.current.filter(
           (l) => l.status === "active" || l.status === "overdue"
         ).length;
         if (activeCount >= BASIC_TIER_LOAN_LIMIT) {
@@ -451,18 +495,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       );
       if (notifId) newLoan.notificationId = notifId;
 
-      const updated = [newLoan, ...loans];
-      await saveLoans(updated);
+      // saveLoans updates loansRef.current immediately, so sequential calls are safe
+      await saveLoans([newLoan, ...loansRef.current]);
 
       if (loan.type === "given") {
-        const newKarma = user.karma + 40;
+        const newKarma = userRef.current.karma + 40;
         await saveUser({
-          ...user,
+          ...userRef.current,
           karma: newKarma,
-          totalGiven: user.totalGiven + loan.amount,
+          totalGiven: userRef.current.totalGiven + loan.amount,
         });
 
-        // Karma event
+        // Karma event — saveKarmaHistory updates karmaHistoryRef.current immediately
         const event: KarmaEvent = {
           id: `karma_give_${newLoan.id}`,
           date: new Date().toISOString(),
@@ -470,9 +514,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           reason: `Дал в долг: ${loan.contact}`,
           icon: "arrow-up-right",
         };
-        await saveKarmaHistory([event, ...karmaHistory]);
+        await saveKarmaHistory([event, ...karmaHistoryRef.current]);
 
-        // Notification
+        // addNotification reads notificationsRef.current (already up-to-date)
         await addNotification({
           type: "karma",
           title: "Карма выросла +40 ⭐",
@@ -481,8 +525,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
       } else {
         await saveUser({
-          ...user,
-          totalTaken: user.totalTaken + loan.amount,
+          ...userRef.current,
+          totalTaken: userRef.current.totalTaken + loan.amount,
         });
 
         await addNotification({
@@ -495,34 +539,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       return { success: true };
     },
-    [loans, user, karmaHistory, addNotification]
+    [addNotification]
   );
 
   const updateLoanStatus = useCallback(
     async (id: string, status: Loan["status"]) => {
-      const updated = loans.map((l) => (l.id === id ? { ...l, status } : l));
+      const updated = loansRef.current.map((l) => (l.id === id ? { ...l, status } : l));
       await saveLoans(updated);
 
       if (status === "returned") {
-        const loan = loans.find((l) => l.id === id);
+        const loan = loansRef.current.find((l) => l.id === id);
         if (loan) {
-          // Cancel the scheduled push reminder
           await cancelNotification(loan.notificationId);
 
           const isEarly = new Date() < new Date(loan.dueDate);
           const karmaPoints = isEarly ? 20 : 10;
-          const newKarma = user.karma + karmaPoints;
 
           await saveUser({
-            ...user,
-            karma: newKarma,
+            ...userRef.current,
+            karma: userRef.current.karma + karmaPoints,
             totalReturned:
               loan.type === "taken"
-                ? user.totalReturned + loan.amount
-                : user.totalReturned,
+                ? userRef.current.totalReturned + loan.amount
+                : userRef.current.totalReturned,
           });
 
-          // Karma event
           const event: KarmaEvent = {
             id: `karma_return_${id}_${Date.now()}`,
             date: new Date().toISOString(),
@@ -532,9 +573,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               : `Возврат займа: ${loan.contact}`,
             icon: isEarly ? "zap" : "check-circle",
           };
-          await saveKarmaHistory([event, ...karmaHistory]);
+          await saveKarmaHistory([event, ...karmaHistoryRef.current]);
 
-          // Notification
           await addNotification({
             type: "karma",
             title: isEarly ? `Досрочно! +${karmaPoints} к карме ⚡` : `Займ закрыт +${karmaPoints} к карме ✓`,
@@ -546,28 +586,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
       }
     },
-    [loans, user, karmaHistory, addNotification]
+    [addNotification]
   );
 
   const updateLoanNote = useCallback(
     async (id: string, note: string) => {
-      const updated = loans.map((l) => (l.id === id ? { ...l, note } : l));
+      const updated = loansRef.current.map((l) => (l.id === id ? { ...l, note } : l));
       await saveLoans(updated);
     },
-    [loans]
+    []
   );
 
   const removeLoan = useCallback(
     async (id: string) => {
-      await saveLoans(loans.filter((l) => l.id !== id));
+      // Uses ref — safe to call sequentially without stale state
+      await saveLoans(loansRef.current.filter((l) => l.id !== id));
     },
-    [loans]
+    []
   );
 
   const addKarma = useCallback(
     async (points: number, reason = "Бонус", icon: FeatherIconName = "star") => {
-      const newKarma = user.karma + points;
-      await saveUser({ ...user, karma: newKarma });
+      await saveUser({ ...userRef.current, karma: userRef.current.karma + points });
 
       const event: KarmaEvent = {
         id: `karma_manual_${Date.now()}`,
@@ -576,51 +616,51 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         reason,
         icon,
       };
-      await saveKarmaHistory([event, ...karmaHistory]);
+      await saveKarmaHistory([event, ...karmaHistoryRef.current]);
     },
-    [user, karmaHistory]
+    []
   );
 
   const markNotificationRead = useCallback(
     async (id: string) => {
-      const updated = notifications.map((n) =>
+      const updated = notificationsRef.current.map((n) =>
         n.id === id ? { ...n, read: true } : n
       );
       await saveNotifications(updated);
     },
-    [notifications]
+    []
   );
 
   const addToBlacklist = useCallback(
     async (name: string) => {
-      if (!blacklist.includes(name)) {
-        await saveBlacklist([...blacklist, name]);
+      if (!blacklistRef.current.includes(name)) {
+        await saveBlacklist([...blacklistRef.current, name]);
       }
     },
-    [blacklist]
+    []
   );
 
   const removeFromBlacklist = useCallback(
     async (name: string) => {
-      await saveBlacklist(blacklist.filter((n) => n !== name));
+      await saveBlacklist(blacklistRef.current.filter((n) => n !== name));
     },
-    [blacklist]
+    []
   );
 
   const getMyDebts = useCallback(
     () =>
-      loans
+      loansRef.current
         .filter((l) => l.type === "taken" && (l.status === "active" || l.status === "overdue"))
         .reduce((s, l) => s + l.amount, 0),
-    [loans]
+    []
   );
 
   const getOwedToMe = useCallback(
     () =>
-      loans
+      loansRef.current
         .filter((l) => l.type === "given" && (l.status === "active" || l.status === "overdue"))
         .reduce((s, l) => s + l.amount, 0),
-    [loans]
+    []
   );
 
   return (

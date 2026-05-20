@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CharacterBubble } from "@/components/CharacterBubble";
-import { getCharacterById } from "@/constants/characters";
+import { CHARACTERS, getCharacterById } from "@/constants/characters";
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -31,8 +31,11 @@ export default function FriendsScreen() {
   const insets = useSafeAreaInsets();
   const { user, addKarma, updateUser } = useApp();
   const [search, setSearch] = useState("");
+  // Prevent re-awarding karma if the user taps "Invite" multiple times in
+  // the same screen session (e.g. opens Share sheet, cancels, tries again).
+  const [sharedThisSession, setSharedThisSession] = useState(false);
 
-  const lucha = getCharacterById("lucha")!;
+  const lucha = getCharacterById("lucha") ?? CHARACTERS[0];
 
   const handleInvite = async () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -43,11 +46,14 @@ export default function FriendsScreen() {
         title: "Приглашение в Дай в долг",
       });
       if (result.action === Share.sharedAction) {
-        await addKarma(30, "Приглашение друга", "user-plus");
         await updateUser({ friendsCount: user.friendsCount + 1 });
+        if (!sharedThisSession) {
+          setSharedThisSession(true);
+          await addKarma(30, "Приглашение друга", "user-plus");
+        }
         Alert.alert(
-          "Отлично! +30 к карме ⭐",
-          "Приглашение отправлено. Как только друг зарегистрируется — карма вырастет!",
+          sharedThisSession ? "Приглашение отправлено!" : "Отлично! +30 к карме ⭐",
+          "Как только друг зарегистрируется — карма вырастет!",
           [{ text: "Здорово!" }]
         );
       }

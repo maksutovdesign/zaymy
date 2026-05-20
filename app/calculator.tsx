@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CharacterBubble } from "@/components/CharacterBubble";
-import { getCharacterById } from "@/constants/characters";
+import { CHARACTERS, getCharacterById } from "@/constants/characters";
 import { useColors } from "@/hooks/useColors";
 
 const RATES = [0, 3, 5, 7, 10, 15];
@@ -42,7 +42,7 @@ export default function CalculatorScreen() {
   }, [amount, term, rate]);
 
   const hasValue = calc.amt > 0;
-  const leyla = getCharacterById("leyla")!;
+  const leyla = getCharacterById("leyla") ?? CHARACTERS[0];
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
