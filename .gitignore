@@ -33,3 +33,10 @@ npm-debug.log*
 
 # Local settings
 .claude/settings.local.json
+
+# Replit-specific (not needed outside Replit environment)
+.replit-artifact/
+server/
+
+# Claude Code local debug config
+.claude/launch.json
