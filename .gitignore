@@ -19,6 +19,14 @@ android/
 .env.local
 .env.*.local
 
+# Apple & Android signing credentials — never commit these
+*.p8
+*.cer
+*.p12
+*.mobileprovision
+*.jks
+google-services-key.json
+
 # OS
 .DS_Store
 Thumbs.db
