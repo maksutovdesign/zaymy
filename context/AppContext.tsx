@@ -599,6 +599,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const removeLoan = useCallback(
     async (id: string) => {
+      // Cancel any pending push notification before removing
+      const loan = loansRef.current.find((l) => l.id === id);
+      if (loan?.notificationId) {
+        await cancelNotification(loan.notificationId);
+      }
       // Uses ref — safe to call sequentially without stale state
       await saveLoans(loansRef.current.filter((l) => l.id !== id));
     },
