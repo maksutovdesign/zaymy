@@ -137,10 +137,18 @@ export async function purchasePremium(tier: 1 | 2): Promise<PurchaseResult> {
     // if (hasEntitlement) return { success: true, tier };
     // return { success: false, error: "Покупка прошла, но доступ не активирован. Нажмите «Восстановить»." };
 
-    // ── FALLBACK (test mode) ──────────────────────────────────────────────
-    // Remove this block in production once RevenueCat is wired up
-    console.warn("[IAP] Test mode: purchase simulated without real billing.");
-    return { success: true, tier };
+    // ── DEV-only fallback ─────────────────────────────────────────────────
+    // Simulates a successful purchase in local development so UI can be tested
+    // without real billing.  In production builds this path returns an error,
+    // preventing free premium access when RevenueCat is not yet wired up.
+    if (__DEV__) {
+      console.warn("[IAP] DEV mode: purchase simulated without real billing.");
+      return { success: true, tier };
+    }
+    return {
+      success: false,
+      error: "Покупки временно недоступны. Пожалуйста, попробуйте позже.",
+    };
     // ─────────────────────────────────────────────────────────────────────
   } catch (e: any) {
     if (e?.userCancelled === true) {
@@ -174,9 +182,12 @@ export async function restorePurchases(): Promise<RestoreResult> {
     // }
     // return { success: true, tier: 0 };
 
-    // ── FALLBACK (test mode) ──────────────────────────────────────────────
-    console.warn("[IAP] Test mode: restore returned no purchases.");
-    return { success: true, tier: 0 };
+    // ── DEV-only fallback ─────────────────────────────────────────────────
+    if (__DEV__) {
+      console.warn("[IAP] DEV mode: restore returned no purchases.");
+      return { success: true, tier: 0 };
+    }
+    return { success: false, error: "Восстановление временно недоступно. Попробуйте позже." };
     // ─────────────────────────────────────────────────────────────────────
   } catch (e: any) {
     return { success: false, error: e?.message ?? "Ошибка восстановления" };
